@@ -2,8 +2,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .models import Post
-from .serializers import PostSerializer
+from .models import Post, Vote
+from .serializers import PostSerializer, VoteSerializer
 
 
 # Create your views here.
@@ -35,9 +35,24 @@ class PostRetrieveDestroy(generics.RetrieveDestroyAPIView):
     permission_class = [permissions.IsAuthenticated]
 
     def delete(self, request, *args, **kwargs):
-        post = Post.objects.filter(poster=self.request.user,pk=self.kwargs['pk'])
+        post = Post.objects.filter(poster=self.request.user, pk=self.kwargs['pk'])
         if post.exists():
             self.destroy(request, *args, **kwargs)
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
             raise ValidationError('You can not delete this post, it does not exist anymore')
+
+
+class VoteCreate(generics.CreateAPIView):
+    serializer_class = VoteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        post = Post.objects.get(pk=self.kwargs['pk'])
+        return Vote.objects.filter(post=post, voter=self.request.user)
+
+    def perform_create(self, serializer):
+        if self.get_queryset().exists():
+            raise ValidationError('You already voted for this post')
+        else:
+            serializer.save(voter=self.request.user, post=Post.objects.get(pk=self.kwargs['pk']))
