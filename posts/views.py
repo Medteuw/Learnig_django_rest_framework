@@ -1,5 +1,7 @@
-from django.shortcuts import render
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+
 from .models import Post
 from .serializers import PostSerializer
 
@@ -23,5 +25,19 @@ class PostList(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     # before saving something into the database
-    def perform_create(self , serializer):
+    def perform_create(self, serializer):
         serializer.save(poster=self.request.user)
+
+
+class PostRetrieveDestroy(generics.RetrieveDestroyAPIView):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+    permission_class = [permissions.IsAuthenticated]
+
+    def delete(self, request, *args, **kwargs):
+        post = Post.objects.filter(poster=self.request.user,pk=self.kwargs['pk'])
+        if post.exists():
+            self.destroy(request, *args, **kwargs)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            raise ValidationError('You can not delete this post, it does not exist anymore')
